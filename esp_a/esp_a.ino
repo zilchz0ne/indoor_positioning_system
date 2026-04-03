@@ -6,20 +6,26 @@ BLEScan* pBLEScan;
 
 void setup() {
   Serial.begin(115200);
+  delay(1000); // give time for serial to stabilize
   BLEDevice::init("");
-  pBLEScan = BLEDevice::getScan(); // create BLE scanner
-  pBLEScan->setActiveScan(true); // active scan for RSSI
+  pBLEScan = BLEDevice::getScan();
+  pBLEScan->setActiveScan(true);
 }
 
 void loop() {
-  BLEScanResults results = pBLEScan->start(2); // scan 2 seconds
-  for (int i = 0; i < results.getCount(); i++) {
-    BLEAdvertisedDevice adv = results.getDevice(i);
-    if (adv.getName() == "TargetESP") {
-      Serial.print("RSSI: ");
-      Serial.println(adv.getRSSI());
-    }
+  BLEScanResults* results = pBLEScan->start(2);
+
+  for (int i = 0; i < results->getCount(); i++) {
+    BLEAdvertisedDevice adv = results->getDevice(i);
+
+    Serial.print("Device: ");
+    Serial.print(adv.getName().c_str());
+    Serial.print(" | RSSI: ");
+    Serial.println(adv.getRSSI());
   }
-  pBLEScan->clearResults(); // clear for next loop
-  delay(500);
+
+  Serial.println("----");
+
+  pBLEScan->clearResults();
+  delay(1000);
 }
