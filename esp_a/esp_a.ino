@@ -18,8 +18,8 @@ void loop() {
   for (int i = 0; i < results->getCount(); i++) {
     BLEAdvertisedDevice adv = results->getDevice(i);
 
-    Serial.print("Device: ");
-    Serial.print(adv.getName().c_str());
+    Serial.print("MAC: ");
+    Serial.print(adv.getAddress().toString().c_str());
     Serial.print(" | RSSI: ");
     Serial.println(adv.getRSSI());
   }
