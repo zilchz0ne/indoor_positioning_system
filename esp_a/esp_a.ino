@@ -4,9 +4,12 @@
 
 BLEScan* pBLEScan;
 
+String targetMAC = "47:d1:fa:c9:e9:91";
+
 void setup() {
   Serial.begin(115200);
-  delay(1000); // give time for serial to stabilize
+  delay(1000);
+
   BLEDevice::init("");
   pBLEScan = BLEDevice::getScan();
   pBLEScan->setActiveScan(true);
@@ -18,14 +21,16 @@ void loop() {
   for (int i = 0; i < results->getCount(); i++) {
     BLEAdvertisedDevice adv = results->getDevice(i);
 
-    Serial.print("MAC: ");
-    Serial.print(adv.getAddress().toString().c_str());
-    Serial.print(" | RSSI: ");
-    Serial.println(adv.getRSSI());
+    String mac = String(adv.getAddress().toString().c_str());
+
+    if (mac == targetMAC) {
+      Serial.print("TARGET RSSI: ");
+      Serial.println(adv.getRSSI());
+    }
   }
 
   Serial.println("----");
 
   pBLEScan->clearResults();
-  delay(1000);
+  delay(500);
 }
