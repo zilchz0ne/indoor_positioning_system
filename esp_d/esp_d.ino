@@ -1,14 +1,37 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
-#include <BLEServer.h>
+#include <BLEScan.h>
 
-void setup() {
-  BLEDevice::init("TargetESP");
-  BLEServer *pServer = BLEDevice::createServer();
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->start(); // broadcast BLE
+BLEScan* pBLEScan;
+
+void setup()
+{
+    Serial.begin(115200);
+
+    BLEDevice::init("");
+    pBLEScan = BLEDevice::getScan();
+    pBLEScan->setActiveScan(true);
 }
 
-void loop() {
-  delay(1000); // nothing else needed
+void loop()
+{
+    BLEScanResults* results = pBLEScan->start(2, false);
+
+    for (int i = 0; i < results->getCount(); i++)
+    {
+        BLEAdvertisedDevice device = results->getDevice(i);
+
+        String name = device.getName();
+        int rssi = device.getRSSI();
+
+        if (name == "Anchor_A" || name == "Anchor_B" || name == "Anchor_C")
+        {
+            Serial.print("Found: ");
+            Serial.print(name);
+            Serial.print(" | RSSI: ");
+            Serial.println(rssi);
+        }
+    }
+
+    Serial.println("----");
 }
