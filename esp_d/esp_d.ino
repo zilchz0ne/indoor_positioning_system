@@ -1,5 +1,6 @@
 #include <BLEDevice.h>
 #include <BLEScan.h>
+#include <math.h>
 
 BLEScan* pBLEScan;
 
@@ -7,6 +8,11 @@ BLEScan* pBLEScan;
 int rssi_A = -100;
 int rssi_B = -100;
 int rssi_C = -100;
+
+// ---------------- MAC ADDRESSES ----------------
+const String MAC_A = "68:fe:71:8b:45:b6";
+const String MAC_B = "b0:cb:d8:cd:33:16";
+const String MAC_C = "68:fe:71:8b:4c:6e";
 
 // ---------------- CONFIG ----------------
 const float TX_POWER = -59.0;
@@ -18,7 +24,7 @@ float rssiToDistance(int rssi)
     return pow(10.0, (TX_POWER - rssi) / (10.0 * PATH_LOSS));
 }
 
-// ---------------- UPDATE RSSI ----------------
+// ---------------- UPDATE RSSI (5 sec avg) ----------------
 void updateRSSI()
 {
     unsigned long start = millis();
@@ -34,20 +40,20 @@ void updateRSSI()
         {
             BLEAdvertisedDevice device = results->getDevice(i);
 
-            String name = device.getName();
+            String mac = device.getAddress().toString();
             int rssi = device.getRSSI();
 
-            if (name == "Anchor_A")
+            if (mac == MAC_A)
             {
                 sumA += rssi;
                 countA++;
             }
-            else if (name == "Anchor_B")
+            else if (mac == MAC_B)
             {
                 sumB += rssi;
                 countB++;
             }
-            else if (name == "Anchor_C")
+            else if (mac == MAC_C)
             {
                 sumC += rssi;
                 countC++;
@@ -57,7 +63,6 @@ void updateRSSI()
         pBLEScan->clearResults();
     }
 
-    // update globals (keep previous if nothing found)
     if (countA > 0) rssi_A = sumA / countA;
     if (countB > 0) rssi_B = sumB / countB;
     if (countC > 0) rssi_C = sumC / countC;
@@ -72,7 +77,7 @@ void setup()
     pBLEScan = BLEDevice::getScan();
     pBLEScan->setActiveScan(true);
 
-    Serial.println("RSSI Collector Started");
+    Serial.println("MAC-based RSSI Scanner Started");
 }
 
 // ---------------- LOOP ----------------
