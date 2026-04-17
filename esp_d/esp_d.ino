@@ -4,51 +4,47 @@
 
 BLEScan* pBLEScan;
 
-// ---------------- GLOBAL RSSI ----------------
-int rssi_A = -100;
-int rssi_B = -100;
-int rssi_C = -100;
-
 // ---------------- MAC ADDRESSES ----------------
 const String MAC_A = "68:fe:71:8b:45:b6";
-const String MAC_B = "b0:cb:d8:ce:24:aa";
 const String MAC_C = "68:fe:71:8b:4c:6e";
 
-// ---------------- CONFIG ----------------
-const float TX_POWER = -59.0;
-const float PATH_LOSS = 2.5;
+// ---------------- GLOBAL RSSI ----------------
+int rssi_A = -100;
+int rssi_C = -100;
 
-float clamp(float d)
+// ---------------- CALIBRATION (your measured 1m RSSI) ----------------
+const float TX_A = -68;
+const float TX_C = -73;
+
+const float N_A = 2.5;
+const float N_C = 2.5;
+
+// ---------------- DISTANCE LIMITS ----------------
+float clampDist(float d)
 {
-    if (d > 5.0) return 5.0;
     if (d < 0.2) return 0.2;
+    if (d > 5.0) return 5.0;
     return d;
 }
 
-void trilaterate(float dA, float dB, float dC, float L, float &x, float &y)
-{
-    // simple closed-form (approximate)
-    x = (dA*dA - dB*dB + L*L) / (2*L);
-    y = (dA*dA - dC*dC + L*L) / (2*L);
-
-    // keep inside first quadrant
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
-}
-
 // ---------------- RSSI → DISTANCE ----------------
-float rssiToDistance(int rssi)
+float distA(int rssi)
 {
-    return pow(10.0, (TX_POWER - rssi) / (10.0 * PATH_LOSS));
+    return pow(10.0, (TX_A - rssi) / (10.0 * N_A));
 }
 
-// ---------------- UPDATE RSSI (5 sec avg) ----------------
+float distC(int rssi)
+{
+    return pow(10.0, (TX_C - rssi) / (10.0 * N_C));
+}
+
+// ---------------- RSSI UPDATE (5s AVG) ----------------
 void updateRSSI()
 {
     unsigned long start = millis();
 
-    float sumA = 0, sumB = 0, sumC = 0;
-    int countA = 0, countB = 0, countC = 0;
+    float sumA = 0, sumC = 0;
+    int countA = 0, countC = 0;
 
     while (millis() - start < 5000)
     {
@@ -66,11 +62,6 @@ void updateRSSI()
                 sumA += rssi;
                 countA++;
             }
-            else if (mac == MAC_B)
-            {
-                sumB += rssi;
-                countB++;
-            }
             else if (mac == MAC_C)
             {
                 sumC += rssi;
@@ -82,17 +73,29 @@ void updateRSSI()
     }
 
     if (countA > 0) rssi_A = sumA / countA;
-    if (countB > 0) rssi_B = sumB / countB;
     if (countC > 0) rssi_C = sumC / countC;
+}
 
-    if (countA > 0) rssi_A = sumA / countA;
-    if (countB > 0) rssi_B = sumB / countB;
-    if (countC > 0) rssi_C = sumC / countC;
+// ---------------- 2-CIRCLE SOLVER (MIDPOINT ORIGIN) ----------------
+// A = (-L/2,0), C = (L/2,0)
 
-    // optional: cap extreme RSSI (helps B)
-    if (rssi_A < -90) rssi_A = -90;
-    if (rssi_B < -90) rssi_B = -90;
-    if (rssi_C < -90) rssi_C = -90;
+void solve2Circles(float dA, float dC, float L,
+                   float &x1, float &y1, float &x2, float &y2)
+{
+    float x = (dA*dA - dC*dC) / (2.0 * L);
+
+    float dxA = x + (L / 2.0);
+
+    float temp = dA*dA - dxA*dxA;
+    if (temp < 0) temp = 0;
+
+    float y = sqrt(temp);
+
+    x1 = x;
+    y1 = y;
+
+    x2 = x;
+    y2 = -y;
 }
 
 // ---------------- SETUP ----------------
@@ -104,7 +107,7 @@ void setup()
     pBLEScan = BLEDevice::getScan();
     pBLEScan->setActiveScan(true);
 
-    Serial.println("MAC-based RSSI Scanner Started");
+    Serial.println("2-anchor midpoint system started");
 }
 
 // ---------------- LOOP ----------------
@@ -112,27 +115,26 @@ void loop()
 {
     updateRSSI();
 
-    Serial.println("---- RSSI VALUES ----");
-    Serial.print("A: "); Serial.println(rssi_A);
-    Serial.print("B: "); Serial.println(rssi_B);
-    Serial.print("C: "); Serial.println(rssi_C);
+    float dA = clampDist(distA(rssi_A));
+    float dC = clampDist(distC(rssi_C));
 
-    float dA = clamp(rssiToDistance(rssi_A));
-float dB = clamp(rssiToDistance(rssi_B));
-float dC = clamp(rssiToDistance(rssi_C));
+    // light smoothing (helps noise)
+    float avg = (dA + dC) / 2.0;
+    dA = (dA + avg) / 2.0;
+    dC = (dC + avg) / 2.0;
 
-// optional: reduce B impact (since it's unstable)
-dB = (dB + dA + dC) / 3.0;
+    float L = 1.0; // set real A-C distance in meters
 
-float x, y;
-float L = 1.0;  // your triangle size
+    float x1, y1, x2, y2;
+    solve2Circles(dA, dC, L, x1, y1, x2, y2);
 
-trilaterate(dA, dB, dC, L, x, y);
+    Serial.println("---- DISTANCES ----");
+    Serial.print("A: "); Serial.println(dA);
+    Serial.print("C: "); Serial.println(dC);
 
-Serial.println("---- POSITION ----");
-Serial.print("x: "); Serial.println(x);
-Serial.print("y: "); Serial.println(y);
-Serial.println("------------------");
+    Serial.println("---- POSSIBLE POSITIONS ----");
+    Serial.print("P1: ("); Serial.print(x1); Serial.print(", "); Serial.print(y1); Serial.println(")");
+    Serial.print("P2: ("); Serial.print(x2); Serial.print(", "); Serial.print(y2); Serial.println(")");
 
-        Serial.println("---------------------");
+    Serial.println("----------------------");
 }
