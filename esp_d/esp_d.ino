@@ -23,7 +23,10 @@ void updateRSSI()
 {
     unsigned long start = millis();
 
-    while (millis() - start < 5000)   // 5 seconds
+    float sumA = 0, sumB = 0, sumC = 0;
+    int countA = 0, countB = 0, countC = 0;
+
+    while (millis() - start < 5000)
     {
         BLEScanResults* results = pBLEScan->start(1, false);
 
@@ -35,17 +38,29 @@ void updateRSSI()
             int rssi = device.getRSSI();
 
             if (name == "Anchor_A")
-                rssi_A = rssi;
-
+            {
+                sumA += rssi;
+                countA++;
+            }
             else if (name == "Anchor_B")
-                rssi_B = rssi;
-
+            {
+                sumB += rssi;
+                countB++;
+            }
             else if (name == "Anchor_C")
-                rssi_C = rssi;
+            {
+                sumC += rssi;
+                countC++;
+            }
         }
 
         pBLEScan->clearResults();
     }
+
+    // update globals (keep previous if nothing found)
+    if (countA > 0) rssi_A = sumA / countA;
+    if (countB > 0) rssi_B = sumB / countB;
+    if (countC > 0) rssi_C = sumC / countC;
 }
 
 // ---------------- SETUP ----------------
