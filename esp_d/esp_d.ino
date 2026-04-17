@@ -11,7 +11,7 @@ int rssi_C = -100;
 
 // ---------------- MAC ADDRESSES ----------------
 const String MAC_A = "68:fe:71:8b:45:b6";
-const String MAC_B = "b0:cb:d8:cd:33:16";
+const String MAC_B = "b0:cb:d8:ce:24:aa";
 const String MAC_C = "68:fe:71:8b:4c:6e";
 
 // ---------------- CONFIG ----------------
