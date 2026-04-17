@@ -3,53 +3,83 @@
 #include <BLEScan.h>
 #include <map>
 #include <vector>
-#include <string>
 #include <math.h>
 
 BLEScan* pBLEScan;
 
 // ---------------- CONFIG ----------------
-const float TX_POWER = -59.0;   // calibration at 1m
-const float PATH_LOSS = 2.5;    // indoor environment
+const float L = 1.0;
+const float TX_POWER = -59.0;
+const float PATH_LOSS = 2.5;
 
-// ---------------- DATA STORAGE ----------------
-std::map<String, std::vector<int>> rssiHistory;
+const int GRID_RES = 20;
 
-// ---------------- UTIL: ADD RSSI ----------------
+// ---------------- DATA ----------------
+std::map<String, std::vector<int>> history;
+
+// last known distances (IMPORTANT FIX)
+float dA = -1, dB = -1, dC = -1;
+
+// ---------------- RSSI ----------------
 void addRSSI(String name, int rssi)
 {
-    std::vector<int>& v = rssiHistory[name];
-
+    auto &v = history[name];
     v.push_back(rssi);
-
-    // keep last 10 values only
-    if (v.size() > 10)
-    {
-        v.erase(v.begin());
-    }
+    if (v.size() > 10) v.erase(v.begin());
 }
 
-// ---------------- UTIL: SMOOTH RSSI ----------------
-float getSmoothedRSSI(String name)
+float smooth(String name)
 {
-    std::vector<int>& v = rssiHistory[name];
-
-    if (v.size() == 0)
-        return -100;
+    auto &v = history[name];
+    if (v.empty()) return -100;
 
     int sum = 0;
-    for (int x : v)
-    {
-        sum += x;
-    }
+    for (int x : v) sum += x;
 
     return (float)sum / v.size();
 }
 
-// ---------------- UTIL: RSSI → DISTANCE ----------------
-float rssiToDistance(float rssi)
+float toDistance(float rssi)
 {
     return pow(10.0, (TX_POWER - rssi) / (10.0 * PATH_LOSS));
+}
+
+// ---------------- GRID SEARCH ----------------
+void computePosition()
+{
+    float bestX = 0, bestY = 0;
+    float bestErr = 1e9;
+
+    float step = L / GRID_RES;
+
+    for (float x = 0; x <= L; x += step)
+    {
+        for (float y = 0; y <= L; y += step)
+        {
+            float pA = sqrt(x*x + y*y);
+            float pB = sqrt((x-L)*(x-L) + y*y);
+            float pC = sqrt(x*x + (y-L)*(y-L));
+
+            float e =
+                fabs(pA - dA) +
+                fabs(pB - dB) +
+                fabs(pC - dC);
+
+            if (e < bestErr)
+            {
+                bestErr = e;
+                bestX = x;
+                bestY = y;
+            }
+        }
+    }
+
+    Serial.print("POSITION → x: ");
+    Serial.print(bestX);
+    Serial.print(" y: ");
+    Serial.print(bestY);
+    Serial.print(" error: ");
+    Serial.println(bestErr);
 }
 
 // ---------------- SETUP ----------------
@@ -61,12 +91,16 @@ void setup()
     pBLEScan = BLEDevice::getScan();
     pBLEScan->setActiveScan(true);
 
-    Serial.println("Scanner started...");
+    Serial.println("V1 FIXED Positioning System");
 }
 
 // ---------------- LOOP ----------------
 void loop()
 {
+    float localA = -1;
+    float localB = -1;
+    float localC = -1;
+
     BLEScanResults* results = pBLEScan->start(2, false);
 
     for (int i = 0; i < results->getCount(); i++)
@@ -80,20 +114,26 @@ void loop()
         {
             addRSSI(name, rssi);
 
-            float smooth = getSmoothedRSSI(name);
-            float dist = rssiToDistance(smooth);
+            float r = smooth(name);
+            float d = toDistance(r);
 
-            Serial.print(name);
-            Serial.print(" | RSSI: ");
-            Serial.print(rssi);
-            Serial.print(" | Smooth: ");
-            Serial.print(smooth);
-            Serial.print(" | Dist: ");
-            Serial.println(dist);
+            if (name == "Anchor_A") localA = d;
+            if (name == "Anchor_B") localB = d;
+            if (name == "Anchor_C") localC = d;
         }
     }
 
-    Serial.println("----");
-
     pBLEScan->clearResults();
+
+    // ONLY compute if ALL 3 found in SAME scan cycle
+    if (localA > 0 && localB > 0 && localC > 0)
+    {
+        dA = localA;
+        dB = localB;
+        dC = localC;
+
+        computePosition();
+    }
+
+    Serial.println("----");
 }
