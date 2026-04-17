@@ -18,6 +18,24 @@ const String MAC_C = "68:fe:71:8b:4c:6e";
 const float TX_POWER = -59.0;
 const float PATH_LOSS = 2.5;
 
+float clamp(float d)
+{
+    if (d > 5.0) return 5.0;
+    if (d < 0.2) return 0.2;
+    return d;
+}
+
+void trilaterate(float dA, float dB, float dC, float L, float &x, float &y)
+{
+    // simple closed-form (approximate)
+    x = (dA*dA - dB*dB + L*L) / (2*L);
+    y = (dA*dA - dC*dC + L*L) / (2*L);
+
+    // keep inside first quadrant
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+}
+
 // ---------------- RSSI → DISTANCE ----------------
 float rssiToDistance(int rssi)
 {
@@ -66,6 +84,15 @@ void updateRSSI()
     if (countA > 0) rssi_A = sumA / countA;
     if (countB > 0) rssi_B = sumB / countB;
     if (countC > 0) rssi_C = sumC / countC;
+
+    if (countA > 0) rssi_A = sumA / countA;
+    if (countB > 0) rssi_B = sumB / countB;
+    if (countC > 0) rssi_C = sumC / countC;
+
+    // optional: cap extreme RSSI (helps B)
+    if (rssi_A < -90) rssi_A = -90;
+    if (rssi_B < -90) rssi_B = -90;
+    if (rssi_C < -90) rssi_C = -90;
 }
 
 // ---------------- SETUP ----------------
@@ -90,10 +117,22 @@ void loop()
     Serial.print("B: "); Serial.println(rssi_B);
     Serial.print("C: "); Serial.println(rssi_C);
 
-    Serial.println("---- DISTANCES ----");
-    Serial.print("A: "); Serial.println(rssiToDistance(rssi_A));
-    Serial.print("B: "); Serial.println(rssiToDistance(rssi_B));
-    Serial.print("C: "); Serial.println(rssiToDistance(rssi_C));
+    float dA = clamp(rssiToDistance(rssi_A));
+float dB = clamp(rssiToDistance(rssi_B));
+float dC = clamp(rssiToDistance(rssi_C));
 
-    Serial.println("---------------------");
+// optional: reduce B impact (since it's unstable)
+dB = (dB + dA + dC) / 3.0;
+
+float x, y;
+float L = 1.0;  // your triangle size
+
+trilaterate(dA, dB, dC, L, x, y);
+
+Serial.println("---- POSITION ----");
+Serial.print("x: "); Serial.println(x);
+Serial.print("y: "); Serial.println(y);
+Serial.println("------------------");
+
+        Serial.println("---------------------");
 }
