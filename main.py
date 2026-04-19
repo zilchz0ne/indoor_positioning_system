@@ -10,6 +10,11 @@ sock.bind(("", 4210))
 plt.ion()
 fig, ax = plt.subplots()
 
+# anchor positions (must match ESP)
+Ax, Ay = -0.5, 0
+Bx, By = 0.0, 1.0
+Cx, Cy = 0.5, 0
+
 while True:
     data, _ = sock.recvfrom(1024)
 
@@ -22,27 +27,34 @@ while True:
 
         p1 = obj["points"][0]
         p2 = obj["points"][1]
+        final = obj["final"]
 
         x1, y1 = p1["x"], p1["y"]
         x2, y2 = p2["x"], p2["y"]
+        fx, fy = final["x"], final["y"]
 
-        # clear and redraw
+        # clear plot
         ax.clear()
 
-        # anchors (fixed)
-        ax.scatter([-0.5, 0.5], [0, 0])  # A and C
-        ax.text(-0.5, 0, "A")
-        ax.text(0.5, 0, "C")
+        # ---- anchors ----
+        ax.scatter([Ax, Bx, Cx], [Ay, By, Cy])
+        ax.text(Ax, Ay, "A")
+        ax.text(Bx, By, "B")
+        ax.text(Cx, Cy, "C")
 
-        # candidate points
-        ax.scatter(x1, y1)
-        ax.scatter(x2, y2)
+        # ---- candidate points (faint) ----
+        ax.scatter(x1, y1, alpha=0.3)
+        ax.scatter(x2, y2, alpha=0.3)
 
-        # styling
+        # ---- final point (main) ----
+        ax.scatter(fx, fy, s=100)
+        ax.text(fx, fy, "Target")
+
+        # ---- styling ----
         ax.set_xlim(-3, 3)
         ax.set_ylim(-3, 3)
         ax.set_aspect('equal')
-        ax.set_title("Indoor Positioning (2-anchor)")
+        ax.set_title("Indoor Positioning (3-anchor)")
 
         plt.pause(0.01)
 
