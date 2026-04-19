@@ -4,29 +4,23 @@
 #include <BLEScan.h>
 #include <math.h>
 
-// ---------------- WIFI ----------------
 const char* ssid = "YOUR_WIFI";
 const char* password = "YOUR_PASS";
 
-// ---------------- UDP ----------------
 WiFiUDP udp;
 const int UDP_PORT = 4210;
 IPAddress broadcastIP(255, 255, 255, 255);
 
-// ---------------- BLE ----------------
 BLEScan* pBLEScan;
 
-// ---------------- MAC ADDRESSES ----------------
 const String MAC_A = "68:fe:71:8b:45:b6";
 const String MAC_B = "68:fe:71:8a:f4:d2";
 const String MAC_C = "68:fe:71:8b:4c:6e";
 
-// ---------------- RSSI ----------------
 int rssi_A = -100;
 int rssi_B = -100;
 int rssi_C = -100;
 
-// ---------------- CALIBRATION ----------------
 const float TX_A = -68;
 const float TX_B = -70;
 const float TX_C = -73;
@@ -35,15 +29,10 @@ const float N_A = 2.5;
 const float N_B = 2.5;
 const float N_C = 2.5;
 
-// ---------------- ANCHOR POSITIONS ----------------
-// A = (-0.5, 0)
-// B = ( 0.0, 1.0)
-// C = ( 0.5, 0)
 float Ax = -0.5, Ay = 0.0;
 float Bx =  0.0, By = 1.0;
 float Cx =  0.5, Cy = 0.0;
 
-// ---------------- DISTANCE LIMIT ----------------
 float clampDist(float d)
 {
     if (d < 0.2) return 0.2;
@@ -51,7 +40,6 @@ float clampDist(float d)
     return d;
 }
 
-// ---------------- RSSI → DISTANCE ----------------
 float distA(int rssi)
 {
     return pow(10.0, (TX_A - rssi) / (10.0 * N_A));
@@ -67,7 +55,6 @@ float distC(int rssi)
     return pow(10.0, (TX_C - rssi) / (10.0 * N_C));
 }
 
-// ---------------- RSSI UPDATE ----------------
 void updateRSSI()
 {
     unsigned long start = millis();
@@ -111,7 +98,6 @@ void updateRSSI()
     if (countC > 0) rssi_C = sumC / countC;
 }
 
-// ---------------- 2-CIRCLE SOLVER ----------------
 void solve2Circles(float dA, float dC, float L,
                    float &x1, float &y1, float &x2, float &y2)
 {
@@ -131,7 +117,6 @@ void solve2Circles(float dA, float dC, float L,
     y2 = -y;
 }
 
-// ---------------- DISTANCE TO B ----------------
 float distToB(float x, float y)
 {
     float dx = x - Bx;
@@ -139,7 +124,6 @@ float distToB(float x, float y)
     return sqrt(dx*dx + dy*dy);
 }
 
-// ---------------- TRUE TRILATERATION ----------------
 void trilaterate(float &x, float &y,
                  float x1, float y1, float r1,
                  float x2, float y2, float r2,
@@ -166,7 +150,6 @@ void trilaterate(float &x, float &y,
     y = (A*F - C*D) / denom;
 }
 
-// ---------------- SEND UDP JSON ----------------
 void sendUDP(float dA, float dB, float dC,
              float x1, float y1,
              float x2, float y2,
@@ -201,7 +184,6 @@ void sendUDP(float dA, float dB, float dC,
     udp.endPacket();
 }
 
-// ---------------- SETUP ----------------
 void setup()
 {
     Serial.begin(115200);
@@ -221,7 +203,6 @@ void setup()
     Serial.println("System ready (full comparison)");
 }
 
-// ---------------- LOOP ----------------
 void loop()
 {
     updateRSSI();
@@ -230,7 +211,6 @@ void loop()
     float dB = clampDist(distB(rssi_B));
     float dC = clampDist(distC(rssi_C));
 
-    // smoothing (A & C only, keep it consistent)
     float avg = (dA + dC) / 2.0;
     dA = (dA + avg) / 2.0;
     dC = (dC + avg) / 2.0;
@@ -240,7 +220,6 @@ void loop()
     float x1, y1, x2, y2;
     solve2Circles(dA, dC, L, x1, y1, x2, y2);
 
-    // choose final using B
     float d1 = distToB(x1, y1);
     float d2 = distToB(x2, y2);
 
@@ -260,7 +239,6 @@ void loop()
         fy = y2;
     }
 
-    // true trilateration
     float tx, ty;
     trilaterate(tx, ty,
                 Ax, Ay, dA,
