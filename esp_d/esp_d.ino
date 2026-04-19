@@ -1,25 +1,37 @@
+#include <WiFi.h>
+#include <WiFiUdp.h>
 #include <BLEDevice.h>
 #include <BLEScan.h>
 #include <math.h>
 
+// ---------------- WIFI ----------------
+const char* ssid = "YOUR_WIFI";
+const char* password = "YOUR_PASS";
+
+// ---------------- UDP ----------------
+WiFiUDP udp;
+const int UDP_PORT = 4210;
+IPAddress broadcastIP(255, 255, 255, 255);
+
+// ---------------- BLE ----------------
 BLEScan* pBLEScan;
 
 // ---------------- MAC ADDRESSES ----------------
 const String MAC_A = "68:fe:71:8b:45:b6";
 const String MAC_C = "68:fe:71:8b:4c:6e";
 
-// ---------------- GLOBAL RSSI ----------------
+// ---------------- RSSI ----------------
 int rssi_A = -100;
 int rssi_C = -100;
 
-// ---------------- CALIBRATION (your measured 1m RSSI) ----------------
+// ---------------- CALIBRATION ----------------
 const float TX_A = -68;
 const float TX_C = -73;
 
 const float N_A = 2.5;
 const float N_C = 2.5;
 
-// ---------------- DISTANCE LIMITS ----------------
+// ---------------- DISTANCE LIMIT ----------------
 float clampDist(float d)
 {
     if (d < 0.2) return 0.2;
@@ -38,7 +50,7 @@ float distC(int rssi)
     return pow(10.0, (TX_C - rssi) / (10.0 * N_C));
 }
 
-// ---------------- RSSI UPDATE (5s AVG) ----------------
+// ---------------- RSSI UPDATE ----------------
 void updateRSSI()
 {
     unsigned long start = millis();
@@ -46,7 +58,7 @@ void updateRSSI()
     float sumA = 0, sumC = 0;
     int countA = 0, countC = 0;
 
-    while (millis() - start < 5000)
+    while (millis() - start < 2000)
     {
         BLEScanResults* results = pBLEScan->start(1, false);
 
@@ -76,9 +88,7 @@ void updateRSSI()
     if (countC > 0) rssi_C = sumC / countC;
 }
 
-// ---------------- 2-CIRCLE SOLVER (MIDPOINT ORIGIN) ----------------
-// A = (-L/2,0), C = (L/2,0)
-
+// ---------------- 2-CIRCLE SOLVER ----------------
 void solve2Circles(float dA, float dC, float L,
                    float &x1, float &y1, float &x2, float &y2)
 {
@@ -98,16 +108,46 @@ void solve2Circles(float dA, float dC, float L,
     y2 = -y;
 }
 
+// ---------------- SEND UDP JSON ----------------
+void sendUDP(float dA, float dC,
+             float x1, float y1,
+             float x2, float y2)
+{
+    String json = "{";
+    json += "\"A\":" + String(dA, 3) + ",";
+    json += "\"C\":" + String(dC, 3) + ",";
+    json += "\"points\":[";
+    json += "{\"x\":" + String(x1, 3) + ",\"y\":" + String(y1, 3) + "},";
+    json += "{\"x\":" + String(x2, 3) + ",\"y\":" + String(y2, 3) + "}";
+    json += "]";
+    json += "}";
+
+    udp.beginPacket(broadcastIP, UDP_PORT);
+    udp.print(json);
+    udp.endPacket();
+}
+
 // ---------------- SETUP ----------------
 void setup()
 {
     Serial.begin(115200);
 
+    // BLE init
     BLEDevice::init("");
     pBLEScan = BLEDevice::getScan();
     pBLEScan->setActiveScan(true);
 
-    Serial.println("2-anchor midpoint system started");
+    // WiFi connect
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(300);
+    }
+
+    // UDP start
+    udp.begin(UDP_PORT);
+
+    Serial.println("System ready");
 }
 
 // ---------------- LOOP ----------------
@@ -118,23 +158,15 @@ void loop()
     float dA = clampDist(distA(rssi_A));
     float dC = clampDist(distC(rssi_C));
 
-    // light smoothing (helps noise)
+    // mild smoothing
     float avg = (dA + dC) / 2.0;
     dA = (dA + avg) / 2.0;
     dC = (dC + avg) / 2.0;
 
-    float L = 1.0; // set real A-C distance in meters
+    float L = 1.0;
 
     float x1, y1, x2, y2;
     solve2Circles(dA, dC, L, x1, y1, x2, y2);
 
-    Serial.println("---- DISTANCES ----");
-    Serial.print("A: "); Serial.println(dA);
-    Serial.print("C: "); Serial.println(dC);
-
-    Serial.println("---- POSSIBLE POSITIONS ----");
-    Serial.print("P1: ("); Serial.print(x1); Serial.print(", "); Serial.print(y1); Serial.println(")");
-    Serial.print("P2: ("); Serial.print(x2); Serial.print(", "); Serial.print(y2); Serial.println(")");
-
-    Serial.println("----------------------");
+    sendUDP(dA, dC, x1, y1, x2, y2);
 }
