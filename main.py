@@ -25,15 +25,21 @@ while True:
 
         obj = json.loads(msg)
 
+        # candidate points
         p1 = obj["points"][0]
         p2 = obj["points"][1]
+
+        # methods
         final = obj["final"]
+        tri = obj["tri"]
 
         x1, y1 = p1["x"], p1["y"]
         x2, y2 = p2["x"], p2["y"]
-        fx, fy = final["x"], final["y"]
 
-        # clear plot
+        fx, fy = final["x"], final["y"]
+        tx, ty = tri["x"], tri["y"]
+
+        # clear
         ax.clear()
 
         # ---- anchors ----
@@ -42,19 +48,23 @@ while True:
         ax.text(Bx, By, "B")
         ax.text(Cx, Cy, "C")
 
-        # ---- candidate points (faint) ----
-        ax.scatter(x1, y1, alpha=0.3)
-        ax.scatter(x2, y2, alpha=0.3)
+        # ---- candidate points (very faint) ----
+        ax.scatter(x1, y1, alpha=0.2)
+        ax.scatter(x2, y2, alpha=0.2)
 
-        # ---- final point (main) ----
+        # ---- your method (final) ----
         ax.scatter(fx, fy, s=100)
-        ax.text(fx, fy, "Target")
+        ax.text(fx, fy, "Final")
+
+        # ---- trilateration ----
+        ax.scatter(tx, ty, marker='x', s=100)
+        ax.text(tx, ty, "Tri")
 
         # ---- styling ----
         ax.set_xlim(-3, 3)
         ax.set_ylim(-3, 3)
         ax.set_aspect('equal')
-        ax.set_title("Indoor Positioning (3-anchor)")
+        ax.set_title("Indoor Positioning: Final vs Trilateration")
 
         plt.pause(0.01)
 

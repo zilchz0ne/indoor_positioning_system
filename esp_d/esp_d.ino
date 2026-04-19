@@ -37,8 +37,8 @@ const float N_C = 2.5;
 
 // ---------------- ANCHOR POSITIONS ----------------
 // A = (-0.5, 0)
-// C = ( 0.5, 0)
 // B = ( 0.0, 1.0)
+// C = ( 0.5, 0)
 float Ax = -0.5, Ay = 0.0;
 float Bx =  0.0, By = 1.0;
 float Cx =  0.5, Cy = 0.0;
@@ -139,11 +139,39 @@ float distToB(float x, float y)
     return sqrt(dx*dx + dy*dy);
 }
 
+// ---------------- TRUE TRILATERATION ----------------
+void trilaterate(float &x, float &y,
+                 float x1, float y1, float r1,
+                 float x2, float y2, float r2,
+                 float x3, float y3, float r3)
+{
+    float A = 2*(x2 - x1);
+    float B = 2*(y2 - y1);
+    float C = r1*r1 - r2*r2 - x1*x1 + x2*x2 - y1*y1 + y2*y2;
+
+    float D = 2*(x3 - x2);
+    float E = 2*(y3 - y2);
+    float F = r2*r2 - r3*r3 - x2*x2 + x3*x3 - y2*y2 + y3*y3;
+
+    float denom = (A*E - B*D);
+
+    if (abs(denom) < 0.0001)
+    {
+        x = 0;
+        y = 0;
+        return;
+    }
+
+    x = (C*E - B*F) / denom;
+    y = (A*F - C*D) / denom;
+}
+
 // ---------------- SEND UDP JSON ----------------
 void sendUDP(float dA, float dB, float dC,
              float x1, float y1,
              float x2, float y2,
-             float fx, float fy)
+             float fx, float fy,
+             float tx, float ty)
 {
     String json = "{";
 
@@ -159,6 +187,11 @@ void sendUDP(float dA, float dB, float dC,
     json += "\"final\":{";
     json += "\"x\":" + String(fx, 3) + ",";
     json += "\"y\":" + String(fy, 3);
+    json += "},";
+
+    json += "\"tri\":{";
+    json += "\"x\":" + String(tx, 3) + ",";
+    json += "\"y\":" + String(ty, 3);
     json += "}";
 
     json += "}";
@@ -185,7 +218,7 @@ void setup()
 
     udp.begin(UDP_PORT);
 
-    Serial.println("System ready (3-anchor)");
+    Serial.println("System ready (full comparison)");
 }
 
 // ---------------- LOOP ----------------
@@ -197,7 +230,7 @@ void loop()
     float dB = clampDist(distB(rssi_B));
     float dC = clampDist(distC(rssi_C));
 
-    // smoothing
+    // smoothing (A & C only, keep it consistent)
     float avg = (dA + dC) / 2.0;
     dA = (dA + avg) / 2.0;
     dC = (dC + avg) / 2.0;
@@ -207,7 +240,7 @@ void loop()
     float x1, y1, x2, y2;
     solve2Circles(dA, dC, L, x1, y1, x2, y2);
 
-    // choose correct point using B
+    // choose final using B
     float d1 = distToB(x1, y1);
     float d2 = distToB(x2, y2);
 
@@ -227,5 +260,12 @@ void loop()
         fy = y2;
     }
 
-    sendUDP(dA, dB, dC, x1, y1, x2, y2, fx, fy);
-}
+    // true trilateration
+    float tx, ty;
+    trilaterate(tx, ty,
+                Ax, Ay, dA,
+                Bx, By, dB,
+                Cx, Cy, dC);
+
+    sendUDP(dA, dB, dC, x1, y1, x2, y2, fx, fy, tx, ty);
+} 
