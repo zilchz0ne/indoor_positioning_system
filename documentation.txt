@@ -1,0 +1,17 @@
+Indoor Positioning System (IPS) Documentation
+
+Architecture Overview:
+We use a "Dumb Edge, Smart Server" setup. The microcontrollers do no math. They just send raw data to a central computer over the local network. All heavy calculations happen on the server in Python. This stops the ESPs from lagging and lets us add new hardware easily without code changes.
+
+1. Anchor Nodes (anchor.ino)
+Anchors are placed on walls or corners. They just broadcast their presence over Bluetooth continuously. The code has no names or hardcoded IDs; the system identifies them purely by their built-in hardware MAC address. The exact same code can be flashed to every single anchor.
+
+2. Target Nodes (target.ino)
+Targets are worn by people or attached to objects. They listen for nearby anchor signals using an asynchronous background scanner. The moment a target catches an anchor signal, it immediately packs the data into a tiny comma-separated text string and broadcasts it via UDP on Port 4210.
+
+Data Format:
+TARGET_ID,ANCHOR_MAC,RSSI
+Example: T1,68:fe:71:8b:45:b6,-65
+
+Network Route:
+Packets are sent to the broadcast IP 255.255.255.255. This means the targets do not need to know the server's IP address beforehand. They just shout the data into the network, and the Python server catches it.
