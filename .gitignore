@@ -1,3 +1,5 @@
 /venv
 .env
 /indoor-positioning-dashboard
+server/__pycache__
+
