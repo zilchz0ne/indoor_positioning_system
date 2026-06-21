@@ -1,0 +1,16 @@
+# Flash anchor (same code for every anchor)
+arduino-cli compile --fqbn esp32:esp32:esp32 anchor/
+arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 anchor/
+
+# Flash target (edit WiFi + anchor MACs in target.ino first)
+arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app target/
+arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 target/
+
+# Serial monitor (115200 baud — wait 2s after reset for clean output)
+arduino-cli monitor -p /dev/ttyUSB0 --config baudrate=115200
+
+# Python server
+cd server && source ../venv/bin/activate && python server.py
+
+# React dashboard
+cd indoor-positioning-dashboard && npm run dev

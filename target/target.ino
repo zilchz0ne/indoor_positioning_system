@@ -1,62 +1,128 @@
+/*
+ * IPS Target Node
+ * ---------------
+ * 1. Connect to WiFi
+ * 2. Scan for BLE anchors every few seconds
+ * 3. Send raw readings to the network:  TARGET_ID,ANCHOR_MAC,RSSI
+ * 4. UDP broadcast on port 4210 (server listens; no target config needed)
+ *
+ * All positioning math happens on the Python server, not here.
+ */
+
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <BLEDevice.h>
 #include <BLEScan.h>
 
-// Network Credentials
-const char* ssid = "YOUR_WIFI";
-const char* password = "YOUR_PASS";
+// --- WiFi (edit before upload) ---
+const char* WIFI_SSID     = "YOUR_WIFI";
+const char* WIFI_PASSWORD = "YOUR_PASS";
 
-// Target Identifier (Change this per human-worn target node, e.g., "T1", "T2")
-const String TARGET_ID = "T1"; 
+// --- Target label sent in every packet ---
+const char* TARGET_ID = "T1";
 
-// UDP Settings
-WiFiUDP udp;
+// --- UDP ---
 const int UDP_PORT = 4210;
-IPAddress broadcastIP(255, 255, 255, 255);
+WiFiUDP udp;
 
-BLEScan* pBLEScan;
-
-// Callback class that fires INSTANTLY whenever a BLE device is spotted
-class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-    void onResult(BLEAdvertisedDevice advertisedDevice) {
-        String mac = advertisedDevice.getAddress().toString();
-        int rssi = advertisedDevice.getRSSI();
-
-        // Construct a clean, tiny CSV string: TARGET,MAC,RSSI
-        String payload = TARGET_ID + "," + mac + "," + String(rssi);
-
-        // Blast it over UDP Broadcast immediately
-        udp.beginPacket(broadcastIP, UDP_PORT);
-        udp.print(payload);
-        udp.endPacket();
-    }
+// --- Anchor MACs (must match server.py ANCHOR_MAP) ---
+const char* ANCHOR_MACS[] = {
+  "68:fe:71:8b:45:b6",   // Anchor A
+  "68:fe:71:8b:4c:6e",   // Anchor B
+  "b0:cb:d8:cd:33:16",   // Anchor C
 };
+const int NUM_ANCHORS = 3;
+
+BLEScan* scanner = nullptr;
+
+// Returns anchor index 0..2, or -1 if MAC is not one of our anchors
+int findAnchorIndex(const String& mac) {
+  String m = mac;
+  m.toLowerCase();
+  for (int i = 0; i < NUM_ANCHORS; i++) {
+    if (m.equals(ANCHOR_MACS[i])) return i;
+  }
+  return -1;
+}
+
+// Broadcast one reading:  T1,68:fe:71:8b:45:b6,-65
+void sendReading(const char* anchorMac, int rssi) {
+  char packet[64];
+  snprintf(packet, sizeof(packet), "%s,%s,%d", TARGET_ID, anchorMac, rssi);
+
+  udp.beginPacket(IPAddress(255, 255, 255, 255), UDP_PORT);
+  udp.write((uint8_t*)packet, strlen(packet));
+  udp.endPacket();
+
+  Serial.printf("UDP -> %s\n", packet);
+}
+
+bool connectWifi() {
+  Serial.printf("WiFi: connecting to '%s'...\n", WIFI_SSID);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  for (int i = 0; i < 40; i++) {  // 20 second timeout
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.printf("WiFi: connected, IP=%s\n", WiFi.localIP().toString().c_str());
+      return true;
+    }
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi: FAILED (check SSID/password)");
+  return false;
+}
 
 void setup() {
-    Serial.begin(115200);
+  Serial.begin(115200);
+  delay(1500);  // let USB serial settle (avoids garbage on monitor open)
+  Serial.println();
+  Serial.println("=== IPS Target ===");
 
-    // Connect to Wi-Fi
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(200);
-    }
+  if (!connectWifi()) {
+    Serial.println("Halting. Fix WiFi and reset.");
+    while (true) delay(1000);
+  }
 
-    // Initialize UDP
-    udp.begin(UDP_PORT);
+  udp.begin(UDP_PORT);
 
-    // Initialize BLE Scanning as an asynchronous stream
-    BLEDevice::init("");
-    pBLEScan = BLEDevice::getScan();
-    pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-    pBLEScan->setActiveScan(true);
-    
-    // Start continuous, non-blocking scanning (0 means scan forever)
-    pBLEScan->start(0, nullptr, false); 
+  BLEDevice::init("");
+  scanner = BLEDevice::getScan();
+  scanner->setActiveScan(true);
+
+  Serial.println("BLE scan ready. Starting loop...");
 }
 
 void loop() {
-    // The loop stays entirely empty. 
-    // The BLE callback handles data capture and Wi-Fi streaming asynchronously.
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi lost — reconnecting...");
+    connectWifi();
+  }
+
+  // Blocking scan: simple, safe (WiFi + UDP only run in main loop)
+  Serial.println("BLE scan...");
+  BLEScanResults* results = scanner->start(3, false);
+
+  if (results == nullptr) {
+    Serial.println("BLE scan failed — retrying...");
     delay(1000);
+    return;
+  }
+
+  int sent = 0;
+  for (int i = 0; i < results->getCount(); i++) {
+    BLEAdvertisedDevice device = results->getDevice(i);
+    int idx = findAnchorIndex(device.getAddress().toString());
+    if (idx >= 0) {
+      sendReading(ANCHOR_MACS[idx], device.getRSSI());
+      sent++;
+    }
+  }
+
+  scanner->clearResults();
+  Serial.printf("Scan done: %d devices seen, %d anchor packets sent\n\n", results->getCount(), sent);
+
+  delay(200);
 }
