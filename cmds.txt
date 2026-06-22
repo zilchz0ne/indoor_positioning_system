@@ -2,7 +2,6 @@
 arduino-cli compile --fqbn esp32:esp32:esp32 anchor/
 arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 anchor/
 
-# Flash target (edit WiFi + anchor MACs in target.ino first)
 arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app target/
 arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 target/
 

@@ -7,7 +7,7 @@ We use a "Dumb Edge, Smart Server" setup. The microcontrollers do no math. They 
 Anchors are placed on walls or corners. They just broadcast their presence over Bluetooth continuously. The code has no names or hardcoded IDs; the system identifies them purely by their built-in hardware MAC address. The exact same code can be flashed to every single anchor.
 
 2. Target Nodes (target.ino)
-Targets are worn by people or attached to objects. They listen for nearby anchor signals using an asynchronous background scanner. The moment a target catches an anchor signal, it immediately packs the data into a tiny comma-separated text string and broadcasts it via UDP on Port 4210.
+Targets scan BLE and forward every device as UDP: TARGET_ID,MAC,RSSI. The server matches MACs against its ANCHORS registry — add new anchors in server.py only (no target re-flash).
 
 Data Format:
 TARGET_ID,ANCHOR_MAC,RSSI

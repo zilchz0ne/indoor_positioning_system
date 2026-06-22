@@ -2,11 +2,12 @@
  * IPS Target Node
  * ---------------
  * 1. Connect to WiFi
- * 2. Scan for BLE anchors every few seconds
- * 3. Send raw readings to the network:  TARGET_ID,ANCHOR_MAC,RSSI
- * 4. UDP broadcast on port 4210 (server listens; no target config needed)
+ * 2. Scan for BLE devices every few seconds
+ * 3. Forward every reading:  TARGET_ID,MAC,RSSI
+ * 4. UDP broadcast on port 4210
  *
- * All positioning math happens on the Python server, not here.
+ * Anchor MACs are NOT configured here — the Python server decides which
+ * MACs are anchors. Add new anchors in server.py only; no target re-flash.
  */
 
 #include <WiFi.h>
@@ -25,30 +26,15 @@ const char* TARGET_ID = "T1";
 const int UDP_PORT = 4210;
 WiFiUDP udp;
 
-// --- Anchor MACs (must match server.py ANCHOR_MAP) ---
-const char* ANCHOR_MACS[] = {
-  "68:fe:71:8b:45:b6",   // Anchor A
-  "68:fe:71:8b:4c:6e",   // Anchor B
-  "b0:cb:d8:cd:33:16",   // Anchor C
-};
-const int NUM_ANCHORS = 3;
+// Ignore very weak BLE signals (phones far away, etc.) — no MAC list needed
+const int RSSI_MIN = -85;
 
 BLEScan* scanner = nullptr;
 
-// Returns anchor index 0..2, or -1 if MAC is not one of our anchors
-int findAnchorIndex(const String& mac) {
-  String m = mac;
-  m.toLowerCase();
-  for (int i = 0; i < NUM_ANCHORS; i++) {
-    if (m.equals(ANCHOR_MACS[i])) return i;
-  }
-  return -1;
-}
-
 // Broadcast one reading:  T1,68:fe:71:8b:45:b6,-65
-void sendReading(const char* anchorMac, int rssi) {
+void sendReading(const char* mac, int rssi) {
   char packet[64];
-  snprintf(packet, sizeof(packet), "%s,%s,%d", TARGET_ID, anchorMac, rssi);
+  snprintf(packet, sizeof(packet), "%s,%s,%d", TARGET_ID, mac, rssi);
 
   udp.beginPacket(IPAddress(255, 255, 255, 255), UDP_PORT);
   udp.write((uint8_t*)packet, strlen(packet));
@@ -62,7 +48,7 @@ bool connectWifi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  for (int i = 0; i < 40; i++) {  // 20 second timeout
+  for (int i = 0; i < 40; i++) {
     if (WiFi.status() == WL_CONNECTED) {
       Serial.printf("WiFi: connected, IP=%s\n", WiFi.localIP().toString().c_str());
       return true;
@@ -77,7 +63,7 @@ bool connectWifi() {
 
 void setup() {
   Serial.begin(115200);
-  delay(1500);  // let USB serial settle (avoids garbage on monitor open)
+  delay(1500);
   Serial.println();
   Serial.println("=== IPS Target ===");
 
@@ -92,7 +78,7 @@ void setup() {
   scanner = BLEDevice::getScan();
   scanner->setActiveScan(true);
 
-  Serial.println("BLE scan ready. Starting loop...");
+  Serial.println("BLE scan ready (server filters anchor MACs).");
 }
 
 void loop() {
@@ -101,7 +87,6 @@ void loop() {
     connectWifi();
   }
 
-  // Blocking scan: simple, safe (WiFi + UDP only run in main loop)
   Serial.println("BLE scan...");
   BLEScanResults* results = scanner->start(3, false);
 
@@ -114,15 +99,15 @@ void loop() {
   int sent = 0;
   for (int i = 0; i < results->getCount(); i++) {
     BLEAdvertisedDevice device = results->getDevice(i);
-    int idx = findAnchorIndex(device.getAddress().toString());
-    if (idx >= 0) {
-      sendReading(ANCHOR_MACS[idx], device.getRSSI());
+    int rssi = device.getRSSI();
+    if (rssi >= RSSI_MIN) {
+      sendReading(device.getAddress().toString().c_str(), rssi);
       sent++;
     }
   }
 
   scanner->clearResults();
-  Serial.printf("Scan done: %d devices seen, %d anchor packets sent\n\n", results->getCount(), sent);
+  Serial.printf("Scan done: %d devices seen, %d packets sent\n\n", results->getCount(), sent);
 
   delay(200);
 }

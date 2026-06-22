@@ -47,8 +47,9 @@ def rssi_to_meters(rssi: int, tx: float, n: float) -> float:
 
 
 def trilaterate() -> dict | None:
-    """Return position dict if all 3 anchors have RSSI, else None."""
-    if any(latest_rssi[mac] is None for mac in ANCHORS):
+    """Return position using all anchors with RSSI (minimum 3 for 2D fix)."""
+    active = [(mac, cfg) for mac, cfg in ANCHORS.items() if latest_rssi.get(mac) is not None]
+    if len(active) < 3:
         return None
 
     anchor_xy = []
@@ -56,7 +57,7 @@ def trilaterate() -> dict | None:
     rssi_out = {}
     dist_out = {}
 
-    for mac, cfg in ANCHORS.items():
+    for mac, cfg in active:
         rssi = latest_rssi[mac]
         dist = rssi_to_meters(rssi, cfg["tx"], cfg["n"])
         anchor_xy.append((cfg["x"], cfg["y"]))
@@ -92,6 +93,21 @@ async def broadcast_position(pos: dict) -> None:
         return
     msg = json.dumps(pos)
     websockets.broadcast(ws_clients, msg)
+
+
+def anchor_config_message() -> str:
+    """Dashboard layout — sent on WebSocket connect."""
+    anchors = [
+        {"name": cfg["name"], "x": cfg["x"], "y": cfg["y"]}
+        for cfg in ANCHORS.values()
+    ]
+    room_w = max((a["x"] for a in anchors), default=5.0)
+    room_h = max((a["y"] for a in anchors), default=5.0)
+    return json.dumps({
+        "type": "config",
+        "anchors": anchors,
+        "room": {"width": room_w, "height": room_h},
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +152,8 @@ async def ws_handler(websocket) -> None:
     ws_clients.add(websocket)
     print(f"[WS] Dashboard connected ({len(ws_clients)} client(s))")
 
-    # Send last known position immediately on connect
+    await websocket.send(anchor_config_message())
+
     if last_position:
         await websocket.send(json.dumps(last_position))
 
