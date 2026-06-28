@@ -21,11 +21,21 @@ UDP_IP = "0.0.0.0"
 UDP_PORT = 4210
 WS_PORT = 8765
 
-# Anchor MAC (lowercase) → name, position (meters), path-loss calibration
+# Platform: 4 ft × 4 ft (48 in × 48 in). All coordinates and distances are in FEET.
+# Corners (anchors on the square board):
+#     B (0,4) ─────────── D (4,4)
+#       │                    │
+#       │     4 ft board     │
+#       │                    │
+#     A (0,0) ─────────── C (4,0)
+PLATFORM_FT = 4.0
+
+# Anchor MAC (lowercase) → name, position (feet), path-loss calibration
 ANCHORS = {
     "68:fe:71:8b:45:b6": {"name": "Anchor_A", "x": 0.0, "y": 0.0, "tx": -59, "n": 2.0},
-    "68:fe:71:8b:4c:6e": {"name": "Anchor_B", "x": 0.0, "y": 4.0, "tx": -59, "n": 2.0},
-    "b0:cb:d8:cd:33:16": {"name": "Anchor_C", "x": 5.0, "y": 0.0, "tx": -59, "n": 2.0},
+    "68:fe:71:8b:4c:6e": {"name": "Anchor_B", "x": 0.0, "y": PLATFORM_FT, "tx": -59, "n": 2.0},
+    "68:fe:71:8a:f4:d2": {"name": "Anchor_C", "x": PLATFORM_FT, "y": 0.0, "tx": -59, "n": 2.0},
+    "98:da:50:04:27:68": {"name": "Anchor_D", "x": PLATFORM_FT, "y": PLATFORM_FT, "tx": -59, "n": 2.0},
 }
 
 # Latest RSSI from each anchor (updated on every UDP packet)
@@ -41,8 +51,8 @@ last_position: dict | None = None
 # ---------------------------------------------------------------------------
 # Math
 # ---------------------------------------------------------------------------
-def rssi_to_meters(rssi: int, tx: float, n: float) -> float:
-    """Log-distance path loss: RSSI → distance in meters."""
+def rssi_to_distance(rssi: int, tx: float, n: float) -> float:
+    """Log-distance path loss: RSSI → distance in feet (same unit as anchor coordinates)."""
     return 10 ** ((tx - rssi) / (10 * n))
 
 
@@ -59,7 +69,7 @@ def trilaterate() -> dict | None:
 
     for mac, cfg in active:
         rssi = latest_rssi[mac]
-        dist = rssi_to_meters(rssi, cfg["tx"], cfg["n"])
+        dist = rssi_to_distance(rssi, cfg["tx"], cfg["n"])
         anchor_xy.append((cfg["x"], cfg["y"]))
         distances.append(dist)
         rssi_out[cfg["name"]] = rssi
@@ -69,7 +79,7 @@ def trilaterate() -> dict | None:
     if last_position:
         guess = [last_position["x"], last_position["y"]]
     else:
-        guess = [2.5, 2.0]
+        guess = [PLATFORM_FT / 2, PLATFORM_FT / 2]
 
     def residuals(pos, anchors=anchor_xy, measured=distances):
         x, y = pos
@@ -101,12 +111,17 @@ def anchor_config_message() -> str:
         {"name": cfg["name"], "x": cfg["x"], "y": cfg["y"]}
         for cfg in ANCHORS.values()
     ]
-    room_w = max((a["x"] for a in anchors), default=5.0)
-    room_h = max((a["y"] for a in anchors), default=5.0)
+    room_w = max((a["x"] for a in anchors), default=PLATFORM_FT)
+    room_h = max((a["y"] for a in anchors), default=PLATFORM_FT)
     return json.dumps({
         "type": "config",
         "anchors": anchors,
-        "room": {"width": room_w, "height": room_h},
+        "room": {
+            "width": room_w,
+            "height": room_h,
+            "unit": "ft",
+            "label": f"{PLATFORM_FT:.0f} ft × {PLATFORM_FT:.0f} ft (48 in × 48 in)",
+        },
     })
 
 

@@ -15,3 +15,11 @@ Example: T1,68:fe:71:8b:45:b6,-65
 
 Network Route:
 Packets are sent to the broadcast IP 255.255.255.255. This means the targets do not need to know the server's IP address beforehand. They just shout the data into the network, and the Python server catches it.
+
+3. Platform layout (4 ft × 4 ft / 48 in square)
+Anchors sit on the four corners of the board. Coordinates use feet (ft):
+  Anchor_A (0, 0) bottom-left   — Anchor_B (0, 4) top-left
+  Anchor_C (4, 0) bottom-right  — Anchor_D (4, 4) top-right
+Configure MAC → position mapping in server/server.py ANCHORS only.
+
+work-progress: dynamic allocation of anchors, modular Architecture of server, plotting with real data and websocket implementation. we lack more esp devices for 3d plotting and need to work on height calculations. 

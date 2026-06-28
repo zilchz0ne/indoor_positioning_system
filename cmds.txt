@@ -13,3 +13,5 @@ cd server && source ../venv/bin/activate && python server.py
 
 # React dashboard
 cd indoor-positioning-dashboard && npm run dev
+
+arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 anchor
