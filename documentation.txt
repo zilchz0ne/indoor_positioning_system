@@ -3,7 +3,7 @@ Indoor Positioning System (IPS) Documentation
 Architecture Overview:
 We use a "Dumb Edge, Smart Server" setup. The microcontrollers do no math. They just send raw data to a central computer over the local network. All heavy calculations happen on the server in Python. This stops the ESPs from lagging and lets us add new hardware easily without code changes.
 
-1. Anchor Nodes (anchor.ino)
+1. Anchor Nodes (anchor.ino, anchor_nano.ino)
 Anchors are placed on walls or corners. They just broadcast their presence over Bluetooth continuously. The code has no names or hardcoded IDs; the system identifies them purely by their built-in hardware MAC address. The exact same code can be flashed to every single anchor.
 
 2. Target Nodes (target.ino)
