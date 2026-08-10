@@ -28,7 +28,7 @@ PLATFORM_FT = 4.0
 # ---------------------------------------------------------------------------
 # Anchor Loader
 # ---------------------------------------------------------------------------
-def load_anchors_from_csv(file_path: str = "anchors.csv") -> dict[str, dict]:
+def load_anchors_from_csv(file_path: str = "anchor_config.csv") -> dict[str, dict]:
     path = Path(file_path)
     if not path.exists():
         raise FileNotFoundError(f"Anchor configuration file '{file_path}' not found.")
