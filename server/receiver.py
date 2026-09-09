@@ -1,3 +1,17 @@
+# listens to data incoming over the network (from target) and puts it inside shared_rssi which is the conveyer belt (in-memory shared dictionary)
+
+"""
+receiver.py
+-----------
+Listens continuously for UDP packets broadcasted by Target nodes over the local network.
+
+Functionality:
+- Binds an asynchronous UDP socket to 0.0.0.0:4210.
+- Parses incoming text payloads formatted as "TARGET_ID,MAC,RSSI".
+- Validates the MAC against the known anchor list from config.csv.
+- Writes the latest RSSI value directly into the shared in-memory dictionary.
+"""
+
 import asyncio
 import socket
 
