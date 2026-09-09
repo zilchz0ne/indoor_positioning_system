@@ -3,3 +3,28 @@
 /indoor-positioning-dashboard
 server/__pycache__
 
+# Byte-code and cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables & secrets
+.env
+
+# Testing & coverage outputs
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution / Build outputs
+dist/
+build/
+*.egg-info/
+
+# Common IDE configs
+.vscode/
+.idea/
