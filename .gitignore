@@ -28,3 +28,6 @@ build/
 # Common IDE configs
 .vscode/
 .idea/
+
+# data collection
+data/
