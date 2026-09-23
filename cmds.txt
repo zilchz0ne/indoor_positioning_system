@@ -15,3 +15,9 @@ cd server && source ../venv/bin/activate && python server.py
 cd indoor-positioning-dashboard && npm run dev
 
 arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 anchor
+
+
+# zz
+arduino-cli compile --fqbn esp32:esp32:esp32 .
+arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 .
+arduino-cli monitor -p /dev/ttyUSB0 --config baudrate=115200
