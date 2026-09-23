@@ -32,5 +32,3 @@ build/
 # data collection
 data/
 
-# config
-server/anchor_config.csv
