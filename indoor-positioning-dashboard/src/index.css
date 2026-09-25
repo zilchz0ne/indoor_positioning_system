@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", monospace;
+  --color-navy-900: #0f172a;
+  --color-navy-800: #1e293b;
+  --color-navy-700: #1e3a5f;
+}
+
+@layer base {
+  body {
+    background-color: #f1f5f9;
+    color: #0f172a;
+    font-family: var(--font-sans);
+    font-size: 18px;
+    line-height: 1.55;
+    overflow-x: hidden;
+  }
+}
+
+/* Light theme — large navy text for readability */
+.ips-page { background-color: #f1f5f9; color: #0f172a; }
+.ips-card {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+.ips-heading {
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 1.375rem;
+  letter-spacing: 0.02em;
+}
+.ips-subheading {
+  color: #1e3a5f;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+.ips-label {
+  color: #1e3a5f;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.ips-value {
+  color: #0f172a;
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ips-value-sm {
+  color: #0f172a;
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ips-muted { color: #334155; font-size: 1rem; font-weight: 600; }
+.ips-border { border-color: #94a3b8; }
+
+.glass-panel {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #e2e8f0; }
+::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }

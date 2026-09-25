@@ -1,6 +1,5 @@
 /venv
 .env
-/indoor-positioning-dashboard
 server/__pycache__
 
 # Byte-code and cache
