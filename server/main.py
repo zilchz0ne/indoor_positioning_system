@@ -89,7 +89,7 @@ async def main():
     shared_clean_positions: Dict[str, Optional[Dict[str, Any]]] = {"T1": None}
 
     solver = TrilaterationSolver(anchors, PLATFORM_FT)
-    dbscan_filter = DBSCANPositionFilter(eps=0.8, min_samples=4)
+    dbscan_filter = DBSCANPositionFilter()
 
     stop_event = asyncio.Event()
 
