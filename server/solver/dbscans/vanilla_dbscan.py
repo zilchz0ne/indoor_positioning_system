@@ -33,7 +33,8 @@ class DBSCANPositionFilter:
             # Not enough sample points in buffer to run density clustering yet
             return None
 
-        target_id = raw_buffer[-1].get("target_id", "T1")
+        # target_id = raw_buffer[-1].get("target_id", "T1")
+        target_id = raw_buffer[-1]["target_id"]
 
         # Extract 2D coordinate array [[x1, y1], [x2, y2], ...]
         coords = np.array([[pt["x"], pt["y"]] for pt in raw_buffer])

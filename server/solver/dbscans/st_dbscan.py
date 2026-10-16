@@ -20,7 +20,8 @@ class DBSCANPositionFilter:
         if not raw_buffer or len(raw_buffer) < self.min_samples:
             return None
 
-        target_id = raw_buffer[-1].get("target_id", "T1")
+        # target_id = raw_buffer[-1].get("target_id", "T1")
+        target_id = raw_buffer[-1]["target_id"]
 
         # Convert buffer points into 3D features: [X, Y, TimeIndex]
         # Index acts as a relative time step (0, 1, 2, ..., N)

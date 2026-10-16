@@ -16,7 +16,8 @@ class DBSCANPositionFilter:
         if not raw_buffer or len(raw_buffer) < self.min_cluster_size:
             return None
 
-        target_id = raw_buffer[-1].get("target_id", "T1")
+        # target_id = raw_buffer[-1].get("target_id", "T1")
+        target_id = raw_buffer[-1]["target_id"]
         coords = np.array([[pt["x"], pt["y"]] for pt in raw_buffer])
 
         # Run HDBSCAN clustering
