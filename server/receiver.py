@@ -1,22 +1,20 @@
-# listens to data incoming over the network (from target) and puts it inside shared_rssi which is the conveyer belt (in-memory shared dictionary)
-
 """
 receiver.py
 -----------
 Listens continuously for UDP packets broadcasted by Target nodes over the local network.
-
-Functionality:
-- Binds an asynchronous UDP socket to 0.0.0.0:4210.
-- Parses incoming text payloads formatted as "TARGET_ID,MAC,RSSI".
-- Validates the MAC against the known anchor list from config.csv.
-- Writes the latest RSSI value directly into the shared in-memory dictionary.
 """
 
 import asyncio
 import socket
+from typing import Dict, Optional
 
 
-async def udp_receiver(shared_rssi: dict[str, int | None], ip: str, port: int, valid_macs: set) -> None:
+async def udp_receiver(
+    shared_rssi: Dict[str, Dict[str, Optional[int]]], 
+    ip: str, 
+    port: int, 
+    valid_macs: set
+) -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((ip, port))
     sock.setblocking(False)
@@ -27,13 +25,21 @@ async def udp_receiver(shared_rssi: dict[str, int | None], ip: str, port: int, v
         data, addr = await loop.sock_recvfrom(sock, 1024)
         try:
             text = data.decode().strip()
-            target_id, mac, rssi_str = text.split(",")
+            parts = text.split(",")
+            if len(parts) != 3:
+                continue
+
+            target_id, mac, rssi_str = parts
+            target_id = target_id.strip()
             mac = mac.lower().strip()
 
+            if not target_id:
+                continue
+
             if mac in valid_macs:
-                # Direct in-memory write (overwrites previous value for this MAC)
-                shared_rssi[mac] = int(rssi_str)
-                # print(f"[Receiver] {target_id} {mac} rssi={rssi_str}")
+                if target_id not in shared_rssi:
+                    shared_rssi[target_id] = {}
+                shared_rssi[target_id][mac] = int(rssi_str)
             else:
                 print(f"[Receiver] Unknown anchor {mac} from {addr[0]}")
 
