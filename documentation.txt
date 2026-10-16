@@ -1,25 +1,42 @@
-Indoor Positioning System (IPS) Documentation
+Indoor Positioning System (IPS) Server Documentation
 
 Architecture Overview:
-We use a "Dumb Edge, Smart Server" setup. The microcontrollers do no math. They just send raw data to a central computer over the local network. All heavy calculations happen on the server in Python. This stops the ESPs from lagging and lets us add new hardware easily without code changes.
+We use a "Dumb Edge, Smart Server" setup. The microcontrollers handle no mathematical solver computations; they continuously scan BLE signals and forward raw readings over UDP. All packet processing, distance conversions, trilateration optimization, and spatial-temporal filtering occur asynchronously on the central Python server.
 
 1. Anchor Nodes (anchor.ino, anchor_nano.ino)
-Anchors are placed on walls or corners. They just broadcast their presence over Bluetooth continuously. The code has no names or hardcoded IDs; the system identifies them purely by their built-in hardware MAC address. The exact same code can be flashed to every single anchor.
+Anchors are placed at fixed reference points and continuously broadcast BLE signals. The firmware contains no hardcoded coordinates or positional roles; anchors are identified purely by their physical hardware MAC addresses.
 
 2. Target Nodes (target.ino)
-Targets scan BLE and forward every device as UDP: TARGET_ID,MAC,RSSI. The server matches MACs against its ANCHORS registry — add new anchors in server.py only (no target re-flash).
-
-Data Format:
-TARGET_ID,ANCHOR_MAC,RSSI
-Example: T1,68:fe:71:8b:45:b6,-65
+Targets scan surrounding BLE anchors and broadcast parsed tuples over local UDP:
+  Data Payload: TARGET_ID,ANCHOR_MAC,RSSI
+  Example:      T1,68:fe:71:8b:45:b6,-65
 
 Network Route:
-Packets are sent to the broadcast IP 255.255.255.255. This means the targets do not need to know the server's IP address beforehand. They just shout the data into the network, and the Python server catches it.
+Packets are broadcasted over UDP (port 4210). The server catches these packets on 0.0.0.0 and filters incoming MAC addresses against the active anchor registry loaded from configuration.
 
-3. Platform layout (4 ft × 4 ft / 48 in square)
-Anchors sit on the four corners of the board. Coordinates use feet (ft):
-  Anchor_A (0, 0) bottom-left   — Anchor_B (0, 4) top-left
-  Anchor_C (4, 0) bottom-right  — Anchor_D (4, 4) top-right
-Configure MAC → position mapping in server/server.py ANCHORS only.
+3. Platform Layout & Configuration (4 ft × 4 ft Square PVC Platform)
+Anchor coordinates, Transmission Power (Tx Power at 1m), and Path-Loss Exponents (n) are dynamically configured via `anchor_config.csv`. 
+Default 4-corner arrangement:
+  Anchor_A (0.0, 0.0) bottom-left  — Anchor_B (0.0, 4.0) top-left
+  Anchor_C (4.0, 0.0) bottom-right — Anchor_D (4.0, 4.0) top-right
 
-work-progress: dynamic allocation of anchors, modular Architecture of server, plotting with real data and websocket implementation. we lack more esp devices for 3d plotting and need to work on height calculations. 
+4. Server Pipeline Architecture
+The Python server operates on an asynchronous concurrency model (`asyncio`):
+  - UDP Receiver (receiver.py):
+    Ingests raw packets into a 2D mapping (`shared_rssi[target_id][mac] = rssi`). Validates MACs against `anchor_config.csv`. Dynamically discovers new targets as packets arrive.
+  - Trilateration Solver (solver/trilateration.py):
+    Stateful per target (`last_known_pos`, `rssi_buffers`). Converts RSSI to distance via Path Loss model, computes hybrid variance-power weights per active anchor, and optimizes 2D position via Non-Linear Least Squares (`scipy.optimize.least_squares`).
+  - DBSCAN Position Filter (solver/dbscan_filter.py):
+    Stateless spatial-temporal position filter. Groups candidate raw target coordinates by target ID and extracts the largest spatial cluster, dropping transient temporal outliers.
+  - Experiment & Metrics Engine (main.py, metrics.py):
+    Captures target trajectory samples per discovered target, calculates Euclidean errors, Mean Absolute Errors, and Root Mean Square Error (RMSE) against real ground truth coordinates.
+
+Current Status & Work-in-Progress:
+  - Dynamic allocation of anchors via CSV configuration.
+  - Dynamic discovery and simultaneous positioning of multiple targets.
+  - Modular asynchronous solver and filter pipeline.
+  - Offline experimental trial collector and metrics calculation engine.
+
+Future Work & Roadmap:
+  - WebSocket implementation for real-time live position visualization.
+  - Expanding anchor deployment for 3D trilateration and z-axis height estimation.
